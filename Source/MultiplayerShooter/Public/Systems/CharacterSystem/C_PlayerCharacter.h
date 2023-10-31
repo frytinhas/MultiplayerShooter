@@ -6,10 +6,6 @@
 #include "GameFramework/Character.h"
 #include "C_PlayerCharacter.generated.h"
 
-// Forward declarations
-class USpringArmComponent;
-class UCameraComponent;
-
 UCLASS()
 class MULTIPLAYERSHOOTER_API AC_PlayerCharacter : public ACharacter
 {
@@ -19,15 +15,13 @@ public:
 	// Sets default values for this character's properties
 	AC_PlayerCharacter();
 
+#pragma region General
 // Components
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	TObjectPtr<USpringArmComponent> PlayerCameraSa;
-
+	TObjectPtr<class USpringArmComponent> PlayerCameraSa;
+	
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	TObjectPtr<USkeletalMeshComponent> Mesh_1P;
-
-	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
-	TObjectPtr<UCameraComponent> PlayerCamera;
+	TObjectPtr<class UCameraComponent> PlayerCamera;
 
 // Variables
 	UPROPERTY(EditDefaultsOnly, Category = Info)
@@ -40,9 +34,68 @@ protected:
 
 public:	
 	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	// virtual void Tick(float DeltaTime) override;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+#pragma endregion General
+	
+#pragma region Weapon System
+// Components
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
+	TObjectPtr<USkeletalMeshComponent> Mesh_1P;
+
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
+	TObjectPtr<USkeletalMeshComponent> WeaponMesh;
+	
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
+	TObjectPtr<class UTextRenderComponent> AmmoQuantity;
+	
+// Variables
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System")
+	TSubclassOf<class AC_WeaponProjectile> ProjectileActorClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System")
+	FName SpawnProjectileWeaponSocket = "Muzzle";
+
+	UPROPERTY(Replicated)
+	bool bIsReloading = false;
+
+	UPROPERTY(Replicated)
+	bool bInFireRateDelay = false;
+	
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon System", ReplicatedUsing = UpdateBulletsInMag)
+	int BulletsInMag = 30;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon System", EditDefaultsOnly)
+	int MaxBulletsInMag = 30;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System")
+	float WeaponFireRate = 0.1f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System")
+	float ReloadTime = 1.4f;
+
+// Timer handles
+	FTimerHandle ExitOfFireRateDelayTimerHandle;
+	FTimerHandle EndReloadWeaponTimerHandle;
+	
+// Functions
+	UFUNCTION()
+	void UpdateBulletsInMag() const;
+	
+	UFUNCTION(BlueprintCallable, Category = "Weapon System", Server, Reliable)
+	void WeaponFire();
+
+	void WeaponFire_Implementation();
+	
+	UFUNCTION(BlueprintCallable, Category = "Weapon System", Server, Unreliable)
+	void ReloadWeapon();
+	
+	void ReloadWeapon_Implementation();
+		
+#pragma endregion Weapon System
 
 };
