@@ -35,11 +35,11 @@ void AC_WeaponProjectile::Tick(float DeltaTime)
 
 void AC_WeaponProjectile::OnProjectileBounce(const FHitResult& ImpactResult, const FVector& ImpactVelocity)
 {
-	//? If is a player, apply damage to player than was hit and destroy projectile
+	//? If is a player, apply damage to player than was hit
 	if (Cast<AC_PlayerCharacter>(ImpactResult.GetActor()))
 	{
-		UGameplayStatics::ApplyDamage(ImpactResult.GetActor(), ProjectileDamage, nullptr, this, UDamageType::StaticClass());
-		Destroy();
+		UGameplayStatics::ApplyDamage(ImpactResult.GetActor(), ProjectileDamage, nullptr, PlayerWhoShot, UDamageType::StaticClass());
+		GEngine->AddOnScreenDebugMessage(0, 5.f, FColor::White, "Projectile bounce");
 	}
 }
 

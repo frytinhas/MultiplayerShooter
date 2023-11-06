@@ -24,6 +24,14 @@
 		{
 			"Name": "FriesLibrary",
 			"Enabled": true
+		},
+		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
+		{
+			"Name": "UIFramework",
+			"Enabled": true
 		}
 	],
 	"TargetPlatforms": [

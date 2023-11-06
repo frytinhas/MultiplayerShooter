@@ -23,15 +23,18 @@ protected:
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	TObjectPtr<class UProjectileMovementComponent> ProjectileComponent;
 
-// Variables
+// Variables{
+public:
+	UPROPERTY()
+	class AC_PlayerCharacter* PlayerWhoShot;
+	
 	UPROPERTY(EditDefaultsOnly, Category = Info)
 	float ProjectileDamage = 10.f;
 	
 // Functions
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
-public:	
+	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
