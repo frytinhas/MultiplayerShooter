@@ -24,10 +24,10 @@ public:
 	TObjectPtr<class UCameraComponent> PlayerCamera;
 
 // Variables
-protected:
-	UPROPERTY(BlueprintReadOnly, Category = References)
+	UPROPERTY(BlueprintReadOnly, Category = References, Replicated)
 	class AC_PlayerCharacterController* PlayerCharacterController;
-	
+
+protected:
 	UPROPERTY(EditDefaultsOnly, Category = Info)
 	FName CameraSocket = "head";
 	
@@ -60,10 +60,31 @@ public:
 	virtual float TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
 private:
-	UFUNCTION(Server, Reliable)
-	void KillPlayer();
+	UFUNCTION(BlueprintCallable, Server, Unreliable)
+	void SetPlayerRunning(const bool bRun);
 
-	void KillPlayer_Implementation();
+	void SetPlayerRunning_Implementation(const bool bRun);
+	
+	UFUNCTION(Server, Reliable)
+	void KillPlayerServer();
+
+	void KillPlayerServer_Implementation();
+
+	UFUNCTION(Client, Reliable)
+	void KillPlayerClient();
+
+	void KillPlayerClient_Implementation();
+
+	FTimerHandle RespawnCharacterTimerHandle;
+	UFUNCTION(Server, Reliable)
+	void RespawnPlayerServer();
+
+	void RespawnPlayerServer_Implementation();
+
+	UFUNCTION(Server, Reliable)
+	void RespawnPlayerClient(AC_PlayerCharacter* NewCharacter);
+
+	void RespawnPlayerClient_Implementation(AC_PlayerCharacter* NewCharacter);
 	
 #pragma endregion General
 	
@@ -85,6 +106,12 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon System")
 	FName SpawnProjectileWeaponSocket = "Muzzle";
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System")
+	class UNiagaraSystem* FireEffect;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System")
+	USoundBase* SoundEffect;
 
 	UPROPERTY(Replicated)
 	bool bIsReloading = false;
@@ -124,9 +151,14 @@ private:
 
 protected:
 	UFUNCTION(BlueprintCallable, Category = "Weapon System", Server, Reliable)
-	void WeaponFire();
+	void WeaponFireServer();
 
-	void WeaponFire_Implementation();
+	void WeaponFireServer_Implementation();
+
+	UFUNCTION(Client, Unreliable)
+	void WeaponFireClient();
+
+	void WeaponFireClient_Implementation();
 
 	// Strafe with weapon and character (-1.0 to left, 0.0 to default, 1.0 to right)
 	UFUNCTION(BlueprintCallable, Category = "Weapon System", Server, Unreliable)

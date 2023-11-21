@@ -18,6 +18,9 @@ public:
 // Components
 protected:
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
+	TObjectPtr<class UCapsuleComponent> ProjectileCollision;
+	
+	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)
 	TObjectPtr<UStaticMeshComponent> ProjectileMesh;
 
 	UPROPERTY(BlueprintReadWrite, EditDefaultsOnly)

@@ -2,6 +2,7 @@
 
 
 #include "Systems/WeaponSystem/C_WeaponProjectile.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Systems/CharacterSystem/C_PlayerCharacter.h"
@@ -13,7 +14,9 @@ AC_WeaponProjectile::AC_WeaponProjectile()
 	PrimaryActorTick.bCanEverTick = true;
 
 	// Create the main components of a projectile
+	ProjectileCollision = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Projectile Collision"));
 	ProjectileMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Projectile Mesh"));
+	ProjectileMesh->SetupAttachment(ProjectileCollision);
 	ProjectileComponent = CreateDefaultSubobject<UProjectileMovementComponent>(TEXT("Projectile Movement Component"));
 	ProjectileComponent->OnProjectileBounce.AddDynamic(this, &AC_WeaponProjectile::OnProjectileBounce);
 	ProjectileComponent->OnProjectileStop.AddDynamic(this, &AC_WeaponProjectile::OnProjectileStop);
@@ -39,13 +42,25 @@ void AC_WeaponProjectile::OnProjectileBounce(const FHitResult& ImpactResult, con
 	if (Cast<AC_PlayerCharacter>(ImpactResult.GetActor()))
 	{
 		UGameplayStatics::ApplyDamage(ImpactResult.GetActor(), ProjectileDamage, nullptr, PlayerWhoShot, UDamageType::StaticClass());
-		GEngine->AddOnScreenDebugMessage(0, 5.f, FColor::White, "Projectile bounce");
 	}
 }
 
 void AC_WeaponProjectile::OnProjectileStop(const FHitResult& ImpactResult)
 {
-	// Only destroy projectile
-	Destroy();
+	if (ProjectileComponent->bShouldBounce)
+	{
+		// Only destroy projectile
+		Destroy();
+	}
+	else
+	{
+		//? If is a player, apply damage to player than was hit and destroy projectile after verification
+		if (Cast<AC_PlayerCharacter>(ImpactResult.GetActor()))
+		{
+			UGameplayStatics::ApplyDamage(ImpactResult.GetActor(), ProjectileDamage, nullptr, PlayerWhoShot, UDamageType::StaticClass());
+		}
+		Destroy();
+	}
+	
 }
 

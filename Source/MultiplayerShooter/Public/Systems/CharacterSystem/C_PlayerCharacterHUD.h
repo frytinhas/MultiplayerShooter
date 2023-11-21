@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
 #include "GameFramework/HUD.h"
 #include "C_PlayerCharacterHUD.generated.h"
 
@@ -14,12 +15,19 @@ class MULTIPLAYERSHOOTER_API AC_PlayerCharacterHUD : public AHUD
 {
 	GENERATED_BODY()
 
+protected:
+	UPROPERTY(BlueprintReadOnly, Category = References)
+	class AC_PlayerCharacterController* PlayerCharacterController;
+	
+	UPROPERTY(EditDefaultsOnly, Category = Info)
+	TSubclassOf<UUserWidget> WidgetToSpawn = UUserWidget::StaticClass();;
+
+	UPROPERTY(BlueprintReadOnly, Category = References)
+	class UC_HUDWidget* HUDWidgetReference = nullptr;
+	
 public:
 	virtual void BeginPlay() override;
-
-	// Function created only to manage hud by C++
-	UFUNCTION(BlueprintImplementableEvent, Category = HUD)
+	
+	UFUNCTION(BlueprintCallable, Category = HUD)
 	void SetHUD(const bool bVisible);
-
-	void SetHUD_Implementation(const bool bVisible);
 };
