@@ -8,12 +8,12 @@
 void AC_PlayerCharacterHUD::BeginPlay()
 {
 	Super::BeginPlay();
-
+	
 	// Set player character hud reference in player controller and set hud on
 	PlayerCharacterController = Cast<AC_PlayerCharacterController>(GetNetOwningPlayer()->PlayerController);
 
 	//? If player character controller is valid, add hud to player screen and set hud variable in player controller
-	if (PlayerCharacterController)
+	if (PlayerCharacterController && HasAuthority())
 	{
 		PlayerCharacterController->PlayerCharacterHUD = this;
 		SetHUD(true);

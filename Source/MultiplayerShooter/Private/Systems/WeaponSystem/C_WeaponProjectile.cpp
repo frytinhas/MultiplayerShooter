@@ -42,6 +42,8 @@ void AC_WeaponProjectile::OnProjectileBounce(const FHitResult& ImpactResult, con
 	if (Cast<AC_PlayerCharacter>(ImpactResult.GetActor()))
 	{
 		UGameplayStatics::ApplyDamage(ImpactResult.GetActor(), ProjectileDamage, nullptr, PlayerWhoShot, UDamageType::StaticClass());
+		// Warn the player who fired that the projectile hit another player
+		PlayerWhoShot->OnHitPlayerWithBullet.Broadcast();
 	}
 }
 
@@ -58,6 +60,11 @@ void AC_WeaponProjectile::OnProjectileStop(const FHitResult& ImpactResult)
 		if (Cast<AC_PlayerCharacter>(ImpactResult.GetActor()))
 		{
 			UGameplayStatics::ApplyDamage(ImpactResult.GetActor(), ProjectileDamage, nullptr, PlayerWhoShot, UDamageType::StaticClass());
+			//? Warn the player (if valid) who fired that the projectile hit another player
+			if (PlayerWhoShot)
+			{
+				PlayerWhoShot->OnHitPlayerWithBullet.Broadcast();
+			}
 		}
 		Destroy();
 	}

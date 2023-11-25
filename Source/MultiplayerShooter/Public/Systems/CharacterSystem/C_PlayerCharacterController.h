@@ -25,8 +25,6 @@ public:
 
 // Functions
 	virtual void BeginPlay() override;
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	virtual void OnPossess(APawn* InPawn) override;
 

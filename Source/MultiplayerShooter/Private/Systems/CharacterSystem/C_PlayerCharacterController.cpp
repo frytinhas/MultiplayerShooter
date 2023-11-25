@@ -24,8 +24,9 @@ void AC_PlayerCharacterController::OnPossess(APawn* InPawn)
 {
 	Super::OnPossess(InPawn);
 
-	// Set new reference to player controller in character by server
+	// Set new reference to player controller in character by server and set hud on
 	SetNewControlledPawn_Server(InPawn);
+	SetHUD(true);
 }
 
 void AC_PlayerCharacterController::SetNewControlledPawn_Server_Implementation(APawn* InPawn)

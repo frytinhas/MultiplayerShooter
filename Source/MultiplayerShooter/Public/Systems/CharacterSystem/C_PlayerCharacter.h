@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "C_PlayerCharacter.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnHitPlayerWithBullet);
+
 UCLASS()
 class MULTIPLAYERSHOOTER_API AC_PlayerCharacter : public ACharacter
 {
@@ -25,7 +27,7 @@ public:
 
 // Variables
 	UPROPERTY(BlueprintReadOnly, Category = References, Replicated)
-	class AC_PlayerCharacterController* PlayerCharacterController;
+    class AC_PlayerCharacterController* PlayerCharacterController;
 
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = Info)
@@ -43,7 +45,7 @@ protected:
 
 public:	
 	// Called every frame
-	// virtual void Tick(float DeltaTime) override;
+	virtual void Tick(float DeltaTime) override;
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -122,6 +124,9 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon System", ReplicatedUsing = UpdateBulletsInMag)
 	int BulletsInMag = 30;
 
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon System", ReplicatedUsing = UpdateIsAiming)
+	bool bIsAiming;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Weapon System", EditDefaultsOnly)
 	int MaxBulletsInMag = 30;
 
@@ -134,31 +139,101 @@ protected:
 	UPROPERTY(Category = "Weapon System", BlueprintReadOnly, Replicated)
 	float StrafeSide;
 
-	UPROPERTY(ReplicatedUsing = UpdateStrafeSide)
-	FRotator StrafeSideRotation;
+	UPROPERTY(Replicated)
+	FRotator TargetStrafeSideRotation;
+
+public:
+	UPROPERTY(BlueprintAssignable, Category = "Weapon System")
+	FOnHitPlayerWithBullet OnHitPlayerWithBullet;
+
+	// Cosmetic thing to warn player than projectile hit other player
+	UPROPERTY(BlueprintReadOnly, Category = "Weapon System")
+	bool bHitIndicator;
+
+	#pragma region Advanced
 
 private:
+	// Get this values on begin play
+	FVector DefaultWeaponMeshLocation, DefaultMesh1PLocation;
+
+	FRotator DefaultWeaponMeshRotation, DefaultMesh1PRotation;
+
+protected:
+	// Target location to weapon mesh on aim
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System", AdvancedDisplay)
+	FVector AimWeaponMeshLocation = FVector(5.0f, 0.0f, -19.7f);
+
+	// Target rotation to weapon mesh on aim
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System", AdvancedDisplay)
+	FRotator AimWeaponMeshRotation = FRotator(0.0f, -90.0f, 0.0f);
+
+	// Target location to first person mesh on aim
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System", AdvancedDisplay)
+	FVector AimMesh1PLocation = FVector(-10.0f, -20.0f, -145.0f);
+
+	// Target rotation to first person mesh on aim
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System", AdvancedDisplay)
+	FRotator AimMesh1PRotation = FRotator(0.5f, -10.0f, 8.0f);
+
+	// Velocity to change location/rotation of weapon mesh/first person mesh
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System", AdvancedDisplay)
+	float WeaponMeshLocationSpeed = 80.0f;
+
+	// Velocity to change rotation of player mesh when strafe
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System", AdvancedDisplay)
+	float StrafeRotationSpeed = 80.0f;
+
+	// Duration of hit indicator in player screen after projectile hit other player
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon System", AdvancedDisplay)
+	float HitIndicatorDuration = 0.3;
+	
+	#pragma endregion Advanced
+
+private:
+	UPROPERTY(Replicated)
+	FVector TargetWeaponMeshLocation;
+
+	UPROPERTY(Replicated)
+	FRotator TargetWeaponMeshRotation;
+
+	UPROPERTY(Replicated)
+	FVector TargetMesh1PLocation;
+
+	UPROPERTY(Replicated)
+	FRotator TargetMesh1PRotation;
+	
 // Timer handles
 	FTimerHandle ExitOfFireRateDelayTimerHandle;
 	FTimerHandle EndReloadWeaponTimerHandle;
+	FTimerHandle EndHitIndicator;
 	
 // Functions
 	UFUNCTION()
 	void UpdateBulletsInMag() const;
 
 	UFUNCTION()
-	void UpdateStrafeSide() const;
+	void UpdateIsAiming() const;
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void HitPlayerWithBullet();
+
+	void HitPlayerWithBullet_Implementation();
+	
 protected:
 	UFUNCTION(BlueprintCallable, Category = "Weapon System", Server, Reliable)
 	void WeaponFireServer();
 
 	void WeaponFireServer_Implementation();
 
-	UFUNCTION(Client, Unreliable)
+	UFUNCTION(Client, Reliable)
 	void WeaponFireClient();
 
 	void WeaponFireClient_Implementation();
+
+	UFUNCTION(BlueprintCallable, Category = "Weapon System", Server, Unreliable)
+    void SetAiming(const bool bEnabled);
+    
+    void SetAiming_Implementation(const bool bEnabled);
 
 	// Strafe with weapon and character (-1.0 to left, 0.0 to default, 1.0 to right)
 	UFUNCTION(BlueprintCallable, Category = "Weapon System", Server, Unreliable)

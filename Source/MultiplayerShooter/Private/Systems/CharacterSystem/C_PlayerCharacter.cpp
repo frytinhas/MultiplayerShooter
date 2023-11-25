@@ -48,6 +48,8 @@ AC_PlayerCharacter::AC_PlayerCharacter()
 
 	AmmoQuantity = CreateDefaultSubobject<UTextRenderComponent>(TEXT("Ammo Quantity"));
 	AmmoQuantity->SetupAttachment(WeaponMesh);
+
+	OnHitPlayerWithBullet.AddDynamic(this, &AC_PlayerCharacter::HitPlayerWithBullet);
 }
 
 // Called when the game starts or when spawned
@@ -55,16 +57,56 @@ void AC_PlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Set bullets in mag and update value in ammo quantity text
-	BulletsInMag = MaxBulletsInMag;
+	//? Set bullets in mag (if is server) and update value in ammo quantity text
+	if (HasAuthority())
+	{
+		BulletsInMag = MaxBulletsInMag;
+	}
 	AmmoQuantity->SetText(UKismetTextLibrary::Conv_IntToText(BulletsInMag));
+
+	// Get default weapon mesh/first person mesh location and rotation
+	DefaultWeaponMeshLocation = WeaponMesh->GetRelativeLocation();
+	DefaultWeaponMeshRotation = WeaponMesh->GetRelativeRotation();
+	DefaultMesh1PLocation = Mesh_1P->GetRelativeLocation();
+	DefaultMesh1PRotation = Mesh_1P->GetRelativeRotation();
+	TargetWeaponMeshLocation = DefaultWeaponMeshLocation;
+	TargetWeaponMeshRotation = DefaultWeaponMeshRotation;
+	TargetMesh1PLocation = DefaultMesh1PLocation;
+	TargetMesh1PRotation = DefaultMesh1PRotation;
 }
 
 // Called every frame
-/*void AC_PlayerCharacter::Tick(float DeltaTime)
+void AC_PlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-}*/
+
+	#pragma region AimSmoothMov
+	// Update weapon mesh location and rotation
+	FVector NextTickLocation = UKismetMathLibrary::VInterpTo_Constant
+	(WeaponMesh->GetRelativeLocation(), TargetWeaponMeshLocation, DeltaTime, WeaponMeshLocationSpeed);
+	FRotator NextTickRotation = UKismetMathLibrary::RInterpTo_Constant
+	(WeaponMesh->GetRelativeRotation(), TargetWeaponMeshRotation, DeltaTime, WeaponMeshLocationSpeed);
+	WeaponMesh->SetRelativeLocationAndRotation(NextTickLocation, NextTickRotation);
+
+	// Update mesh 1p location and rotation
+	NextTickLocation = UKismetMathLibrary::VInterpTo_Constant
+	(Mesh_1P->GetRelativeLocation(), TargetMesh1PLocation, DeltaTime, WeaponMeshLocationSpeed);
+	NextTickRotation = UKismetMathLibrary::RInterpTo_Constant
+	(Mesh_1P->GetRelativeRotation(), TargetMesh1PRotation, DeltaTime, WeaponMeshLocationSpeed);
+	Mesh_1P->SetRelativeLocationAndRotation(NextTickLocation, NextTickRotation);
+	#pragma endregion AimSmoothMov
+
+	#pragma region StrafeSmoothMov
+	// Update strafe side rotation
+	NextTickRotation = UKismetMathLibrary::RInterpTo_Constant
+	(PlayerCameraSa->GetRelativeRotation(), TargetStrafeSideRotation, DeltaTime, StrafeRotationSpeed);
+	PlayerCameraSa->SetRelativeRotation(NextTickRotation);
+
+	// Update socket offset to smooth camera movement
+	PlayerCameraSa->SocketOffset.Y = UKismetMathLibrary::FInterpTo_Constant(PlayerCameraSa->SocketOffset.Y,
+		StrafeSide == 1.0f ? 10.0f : StrafeSide == -1.0f ? -10.0f : 0.0f, DeltaTime, StrafeRotationSpeed);
+	#pragma endregion StrafeSmoothMov
+}
 
 // Called to bind functionality to input
 void AC_PlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -79,10 +121,15 @@ void AC_PlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 	DOREPLIFETIME(AC_PlayerCharacter, bIsReloading)
 	DOREPLIFETIME(AC_PlayerCharacter, bInFireRateDelay)
 	DOREPLIFETIME(AC_PlayerCharacter, BulletsInMag)
+	DOREPLIFETIME(AC_PlayerCharacter, bIsAiming)
 	DOREPLIFETIME(AC_PlayerCharacter, Health)
 	DOREPLIFETIME(AC_PlayerCharacter, StrafeSide)
-	DOREPLIFETIME(AC_PlayerCharacter, StrafeSideRotation)
+	DOREPLIFETIME(AC_PlayerCharacter, TargetStrafeSideRotation)
 	DOREPLIFETIME(AC_PlayerCharacter, PlayerCharacterController)
+	DOREPLIFETIME(AC_PlayerCharacter, TargetWeaponMeshLocation)
+	DOREPLIFETIME(AC_PlayerCharacter, TargetWeaponMeshRotation)
+	DOREPLIFETIME(AC_PlayerCharacter, TargetMesh1PLocation)
+	DOREPLIFETIME(AC_PlayerCharacter, TargetMesh1PRotation)
 }
 
 float AC_PlayerCharacter::TakeDamage(float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator,
@@ -159,9 +206,6 @@ void AC_PlayerCharacter::RespawnPlayerClient_Implementation(AC_PlayerCharacter* 
 {
 	// Possess new character
 	PlayerCharacterController->Possess(NewCharacter);
-	// Enable input and hud
-	EnableInput(PlayerCharacterController);
-	PlayerCharacterController->SetHUD(true);
 }
 
 #pragma endregion General
@@ -169,16 +213,39 @@ void AC_PlayerCharacter::RespawnPlayerClient_Implementation(AC_PlayerCharacter* 
 #pragma region Weapon System
 void AC_PlayerCharacter::UpdateBulletsInMag() const
 {
-	// Update bullets in mag text in client
-	AmmoQuantity->SetText(UKismetTextLibrary::Conv_IntToText(BulletsInMag));
+	//? Verify if is not reloading
+	if (!bIsReloading)
+	{
+		// Update bullets in mag text in client
+		AmmoQuantity->SetText(UKismetTextLibrary::Conv_IntToText(BulletsInMag));
+	}
+	else
+	{
+		// Update bullets to reload in client
+		AmmoQuantity->SetText(UKismetTextLibrary::Conv_StringToText("R"));
+	}
 }
 
-void AC_PlayerCharacter::UpdateStrafeSide() const
+void AC_PlayerCharacter::UpdateIsAiming() const
 {
-	// Update strafe side in client
-	PlayerCameraSa->SetRelativeRotation(StrafeSideRotation);
+	// Attach weapon mesh in client
+	if (bIsAiming)
+	{
+		WeaponMesh->AttachToComponent(PlayerCamera, FAttachmentTransformRules::KeepWorldTransform);
+	}
+	else
+	{
+		WeaponMesh->AttachToComponent(Mesh_1P, FAttachmentTransformRules::KeepWorldTransform, "GripPoint");
+	}
+}
 
-	PlayerCameraSa->SocketOffset.Y = StrafeSide == 1.0f ? 10.0f : StrafeSide == -1.0f ? -10.0f : 0.0f;
+void AC_PlayerCharacter::HitPlayerWithBullet_Implementation()
+{
+	bHitIndicator = true;
+	GetWorldTimerManager().SetTimer(EndHitIndicator, [this]
+	{
+		bHitIndicator = false;
+	}, HitIndicatorDuration, false);
 }
 
 void AC_PlayerCharacter::WeaponFireClient_Implementation()
@@ -198,6 +265,30 @@ void AC_PlayerCharacter::WeaponFireClient_Implementation()
 	}
 }
 
+void AC_PlayerCharacter::SetAiming_Implementation(const bool bEnabled)
+{
+	// Set is aiming enabled
+	bIsAiming = bEnabled;
+	
+	//? Verify if is aiming and set the weapon mesh/first person mesh target position
+	if (bEnabled)
+	{
+		WeaponMesh->AttachToComponent(PlayerCamera, FAttachmentTransformRules::KeepWorldTransform);
+		TargetWeaponMeshLocation = AimWeaponMeshLocation;
+		TargetWeaponMeshRotation = AimWeaponMeshRotation;
+		TargetMesh1PLocation = AimMesh1PLocation;
+		TargetMesh1PRotation = AimMesh1PRotation;
+	}
+	else
+	{
+		WeaponMesh->AttachToComponent(Mesh_1P, FAttachmentTransformRules::KeepWorldTransform, "GripPoint");
+		TargetWeaponMeshLocation = DefaultWeaponMeshLocation;
+		TargetWeaponMeshRotation = DefaultWeaponMeshRotation;
+		TargetMesh1PLocation = DefaultMesh1PLocation;
+		TargetMesh1PRotation = DefaultMesh1PRotation;
+	}
+}
+
 void AC_PlayerCharacter::WeaponFireServer_Implementation()
 {
 	//? Verify if player not reloading weapon or in fire rate delay
@@ -206,8 +297,25 @@ void AC_PlayerCharacter::WeaponFireServer_Implementation()
 		//? Verify if have bullets in mag, if not, reload weapon
 		if (BulletsInMag > 0)
 		{
-			const FRotator ProjectileRotation = UKismetMathLibrary::FindLookAtRotation(WeaponMesh->GetSocketLocation(SpawnProjectileWeaponSocket),
-				PlayerCamera->GetComponentLocation() + PlayerCamera->GetForwardVector() * 10000.f);
+			FRotator ProjectileRotation;
+			// Verify if is aiming (if yes, apply dispersion)
+			if (bIsAiming)
+			{
+				ProjectileRotation = UKismetMathLibrary::FindLookAtRotation(WeaponMesh->GetSocketLocation(SpawnProjectileWeaponSocket),
+					PlayerCamera->GetComponentLocation() + PlayerCamera->GetForwardVector() * 10000.f);
+			}
+			else
+			{
+				ProjectileRotation = UKismetMathLibrary::FindLookAtRotation(
+					WeaponMesh->GetSocketLocation(SpawnProjectileWeaponSocket),
+					PlayerCamera->GetComponentLocation() +
+					(
+						PlayerCamera->GetForwardVector() * 10000.f +
+						PlayerCamera->GetRightVector() * UKismetMathLibrary::RandomFloatInRange(-1000.f, 1000.f) +
+						PlayerCamera->GetUpVector() * UKismetMathLibrary::RandomFloatInRange(-1000.f, 1000.f))
+					);
+			}
+			
 			const FTransform SpawnTransform = FTransform(
 				ProjectileRotation,
 				WeaponMesh->GetSocketLocation(SpawnProjectileWeaponSocket),
@@ -240,31 +348,10 @@ void AC_PlayerCharacter::StrafeCharacter_Implementation(const float TargetStrafe
 	{
 		// Create target rotation and did a verifications
 		StrafeSide = TargetStrafeSide;
-		FRotator TargetRotation = PlayerCameraSa->GetRelativeRotation();
+		TargetStrafeSideRotation = PlayerCameraSa->GetRelativeRotation();
 
 		//? Verify if strafe side is equal a 1.0f or -1.0f and apply roll rotation
-		if (TargetStrafeSide == 1.0f)
-		{
-			TargetRotation.Roll = 15.0f;
-			PlayerCameraSa->SetRelativeRotation(TargetRotation);
-			PlayerCameraSa->SocketOffset.Y = 10.0f;
-			StrafeSideRotation = TargetRotation;
-			return;
-		}
-		else if (TargetStrafeSide == -1.0f)
-		{
-			TargetRotation.Roll = -15.0f;
-			PlayerCameraSa->SetRelativeRotation(TargetRotation);
-			PlayerCameraSa->SocketOffset.Y = -10.0f;
-			StrafeSideRotation = TargetRotation;
-			return;
-		}
-
-		// Set roll rotation in 0.0f
-		TargetRotation.Roll = 0.0f;
-		PlayerCameraSa->SetRelativeRotation(TargetRotation);
-		PlayerCameraSa->SocketOffset.Y = 0.0f;
-		StrafeSideRotation = TargetRotation;
+		TargetStrafeSideRotation.Roll = StrafeSide == 1.0f ? 15.0f : StrafeSide == -1.0f ? -15.0f : 0.0f;
 	}
 }
 
@@ -275,12 +362,14 @@ void AC_PlayerCharacter::ReloadWeapon_Implementation()
 	{
 		// Set bIsReloading to true, for player don't fire
 		bIsReloading = true;
+		BulletsInMag = 0;
+		UpdateBulletsInMag();
 		// Set timer to reload weapon
 		GetWorldTimerManager().SetTimer(EndReloadWeaponTimerHandle, [this]
 		{
+			bIsReloading = false;
 			BulletsInMag = MaxBulletsInMag;
 			UpdateBulletsInMag();
-			bIsReloading = false;
 		},
 		ReloadTime, false);
 	}
