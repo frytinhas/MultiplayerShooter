@@ -155,6 +155,8 @@ void AC_PlayerCharacter::SetPlayerRunning_Implementation(const bool bRun)
 {
 	// Stop strafe to run
 	StrafeCharacter(0.0f);
+	// Stop aiming
+	SetAiming(false);
 	// Set max walk speed bt bRun
 	GetCharacterMovement()->MaxWalkSpeed = bRun ? 900.0f : 600.0f;
 }
@@ -267,25 +269,29 @@ void AC_PlayerCharacter::WeaponFireClient_Implementation()
 
 void AC_PlayerCharacter::SetAiming_Implementation(const bool bEnabled)
 {
-	// Set is aiming enabled
-	bIsAiming = bEnabled;
-	
-	//? Verify if is aiming and set the weapon mesh/first person mesh target position
-	if (bEnabled)
+	//? Verify if player is not running to aim
+	if (GetCharacterMovement()->MaxWalkSpeed <= 600.0f)
 	{
-		WeaponMesh->AttachToComponent(PlayerCamera, FAttachmentTransformRules::KeepWorldTransform);
-		TargetWeaponMeshLocation = AimWeaponMeshLocation;
-		TargetWeaponMeshRotation = AimWeaponMeshRotation;
-		TargetMesh1PLocation = AimMesh1PLocation;
-		TargetMesh1PRotation = AimMesh1PRotation;
-	}
-	else
-	{
-		WeaponMesh->AttachToComponent(Mesh_1P, FAttachmentTransformRules::KeepWorldTransform, "GripPoint");
-		TargetWeaponMeshLocation = DefaultWeaponMeshLocation;
-		TargetWeaponMeshRotation = DefaultWeaponMeshRotation;
-		TargetMesh1PLocation = DefaultMesh1PLocation;
-		TargetMesh1PRotation = DefaultMesh1PRotation;
+		// Set is aiming enabled
+		bIsAiming = bEnabled;
+		
+		//? Verify if is aiming and set the weapon mesh/first person mesh target position
+		if (bEnabled)
+		{
+			WeaponMesh->AttachToComponent(PlayerCamera, FAttachmentTransformRules::KeepWorldTransform);
+			TargetWeaponMeshLocation = AimWeaponMeshLocation;
+			TargetWeaponMeshRotation = AimWeaponMeshRotation;
+			TargetMesh1PLocation = AimMesh1PLocation;
+			TargetMesh1PRotation = AimMesh1PRotation;
+		}
+		else
+		{
+			WeaponMesh->AttachToComponent(Mesh_1P, FAttachmentTransformRules::KeepWorldTransform, "GripPoint");
+			TargetWeaponMeshLocation = DefaultWeaponMeshLocation;
+			TargetWeaponMeshRotation = DefaultWeaponMeshRotation;
+			TargetMesh1PLocation = DefaultMesh1PLocation;
+			TargetMesh1PRotation = DefaultMesh1PRotation;
+		}
 	}
 }
 

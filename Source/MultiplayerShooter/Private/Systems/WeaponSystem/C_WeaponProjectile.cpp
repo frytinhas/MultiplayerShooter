@@ -57,11 +57,12 @@ void AC_WeaponProjectile::OnProjectileStop(const FHitResult& ImpactResult)
 	else
 	{
 		//? If is a player, apply damage to player than was hit and destroy projectile after verification
-		if (Cast<AC_PlayerCharacter>(ImpactResult.GetActor()))
+		if (AC_PlayerCharacter* PlayerWhoHit; Cast<AC_PlayerCharacter>(ImpactResult.GetActor()))
 		{
-			UGameplayStatics::ApplyDamage(ImpactResult.GetActor(), ProjectileDamage, nullptr, PlayerWhoShot, UDamageType::StaticClass());
+			PlayerWhoHit = Cast<AC_PlayerCharacter>(ImpactResult.GetActor());
+			UGameplayStatics::ApplyDamage(PlayerWhoHit, ProjectileDamage, nullptr, PlayerWhoShot, UDamageType::StaticClass());
 			//? Warn the player (if valid) who fired that the projectile hit another player
-			if (PlayerWhoShot)
+			if (float MaxHealth; PlayerWhoShot && PlayerWhoHit->GetHealthAndMaxHealth(MaxHealth) != 0.0f)
 			{
 				PlayerWhoShot->OnHitPlayerWithBullet.Broadcast();
 			}
